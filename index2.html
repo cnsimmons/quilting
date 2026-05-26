@@ -374,20 +374,23 @@ canvas.addEventListener('click', (e) => {
 });
 
 function floodFillPattern(startX, startY, patternImageData, tileSize) {
+  if (!originalImageData) return;
   const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const data = imageData.data;
+  const orig = originalImageData.data;
   const w = canvas.width, h = canvas.height;
   const startIdx = (startY * w + startX) * 4;
-  const sR = data[startIdx], sG = data[startIdx+1], sB = data[startIdx+2];
 
-  if (sR + sG + sB < 280) return; // don't fill lines
+  // Region boundaries come from the ORIGINAL line art, never from the current
+  // (already-painted) pixels. This way, a dark fabric in a region doesn't get
+  // mistaken for a wall when you try to repaint that region.
+  const LINE_SUM = 280;
+  if (orig[startIdx] + orig[startIdx+1] + orig[startIdx+2] < LINE_SUM) return;
 
-  const tolSq = 70 * 70;
   const visited = new Uint8Array(w * h);
   const stack = [startX, startY];
   const pData = patternImageData.data;
   const pW = patternImageData.width;
-  const pH = patternImageData.height;
   const scale = pW / tileSize;
 
   while (stack.length) {
@@ -396,12 +399,10 @@ function floodFillPattern(startX, startY, patternImageData, tileSize) {
     if (x < 0 || x >= w || y < 0 || y >= h) continue;
     const vi = y * w + x;
     if (visited[vi]) continue;
-    const i = vi * 4;
-    const dr = data[i] - sR;
-    const dg = data[i+1] - sG;
-    const db = data[i+2] - sB;
-    if (dr*dr + dg*dg + db*db > tolSq) continue;
     visited[vi] = 1;
+    const i = vi * 4;
+    // Wall check uses the original image, not the current canvas
+    if (orig[i] + orig[i+1] + orig[i+2] < LINE_SUM) continue;
 
     const px = Math.floor((x % tileSize) * scale);
     const py = Math.floor((y % tileSize) * scale);
